@@ -5,6 +5,34 @@
 /* eslint one-var: 0 */
 import Const from '../Const';
 
+function _sort(arr, sortField, order, sortFunc, sortFuncExtraData) {
+  order = order.toLowerCase();
+  const isDesc = order === Const.SORT_DESC;
+  arr.sort((a, b) => {
+    if (sortFunc) {
+      return sortFunc(a, b, order, sortField, sortFuncExtraData);
+    } else {
+      const valueA = a[sortField] === null ? '' : a[sortField];
+      const valueB = b[sortField] === null ? '' : b[sortField];
+      if (isDesc) {
+        if (typeof valueB === 'string') {
+          return valueB.localeCompare(valueA);
+        } else {
+          return valueA > valueB ? -1 : ((valueA < valueB) ? 1 : 0);
+        }
+      } else {
+        if (typeof valueA === 'string') {
+          return valueA.localeCompare(valueB);
+        } else {
+          return valueA < valueB ? -1 : ((valueA > valueB) ? 1 : 0);
+        }
+      }
+    }
+  });
+
+  return arr;
+}
+
 export class TableDataStore {
 
   constructor(data) {
@@ -14,11 +42,10 @@ export class TableDataStore {
     this.isOnFilter = false;
     this.filterObj = null;
     this.searchText = null;
-    this.sortList = [];
+    this.sortObj = null;
     this.pageObj = {};
     this.selected = [];
     this.multiColumnSearch = false;
-    this.multiColumnSort = 1;
     this.showOnlySelected = false;
     this.remote = false; // remote data
   }
@@ -29,17 +56,6 @@ export class TableDataStore {
     this.colInfos = props.colInfos;
     this.remote = props.remote;
     this.multiColumnSearch = props.multiColumnSearch;
-    this.multiColumnSort = props.multiColumnSort;
-  }
-
-  clean() {
-    this.filteredData = null;
-    this.isOnFilter = false;
-    this.filterObj = null;
-    this.searchText = null;
-    this.sortList = [];
-    this.pageObj = {};
-    this.selected = [];
   }
 
   setData(data) {
@@ -56,56 +72,14 @@ export class TableDataStore {
   }
 
   getSortInfo() {
-    return this.sortList;
+    return this.sortObj;
   }
 
   setSortInfo(order, sortField) {
-    if (typeof order !== typeof sortField) {
-      throw new Error('The type of sort field and order should be both with String or Array');
-    }
-    if (Array.isArray(order) && Array.isArray(sortField)) {
-      if (order.length !== sortField.length) {
-        throw new Error('The length of sort fields and orders should be equivalent');
-      }
-      order = order.slice().reverse();
-      this.sortList = sortField.slice().reverse().map((field, i) => {
-        return {
-          order: order[i],
-          sortField: field
-        };
-      });
-      this.sortList = this.sortList.slice(0, this.multiColumnSort);
-    } else {
-      const sortObj = {
-        order: order,
-        sortField: sortField
-      };
-
-      if (this.multiColumnSort > 1) {
-        let i = this.sortList.length - 1;
-        let sortFieldInHistory = false;
-
-        for (; i >= 0; i--) {
-          if (this.sortList[i].sortField === sortField) {
-            sortFieldInHistory = true;
-            break;
-          }
-        }
-
-        if (sortFieldInHistory) {
-          if (i > 0) {
-            this.sortList = this.sortList.slice(0, i);
-          } else {
-            this.sortList = this.sortList.slice(1);
-          }
-        }
-
-        this.sortList.unshift(sortObj);
-        this.sortList = this.sortList.slice(0, this.multiColumnSort);
-      } else {
-        this.sortList = [ sortObj ];
-      }
-    }
+    this.sortObj = {
+      order: order,
+      sortField: sortField
+    };
   }
 
   setSelectedRowKey(selectedRowKeys) {
@@ -133,8 +107,8 @@ export class TableDataStore {
       if (this.filterObj !== null) this.filter(this.filterObj);
       if (this.searchText !== null) this.search(this.searchText);
     }
-    if (!skipSorting && this.sortList.length > 0) {
-      this.sort();
+    if (!skipSorting && this.sortObj) {
+      this.sort(this.sortObj.order, this.sortObj.sortField);
     }
   }
 
@@ -151,10 +125,14 @@ export class TableDataStore {
     }
   }
 
-  sort() {
-    let currentDisplayData = this.getCurrentDisplayData();
+  sort(order, sortField) {
+    this.setSortInfo(order, sortField);
 
-    currentDisplayData = this._sort(currentDisplayData);
+    let currentDisplayData = this.getCurrentDisplayData();
+    if (!this.colInfos[sortField]) return this;
+
+    const { sortFunc, sortFuncExtraData } = this.colInfos[sortField];
+    currentDisplayData = _sort(currentDisplayData, sortField, order, sortFunc, sortFuncExtraData);
 
     return this;
   }
@@ -189,12 +167,12 @@ export class TableDataStore {
 
   addAtBegin(newObj) {
     if (!newObj[this.keyField] || newObj[this.keyField].toString() === '') {
-      throw new Error(`${this.keyField} can't be empty value.`);
+      throw `${this.keyField} can't be empty value.`;
     }
     const currentDisplayData = this.getCurrentDisplayData();
     currentDisplayData.forEach(function(row) {
       if (row[this.keyField].toString() === newObj[this.keyField].toString()) {
-        throw new Error(`${this.keyField} ${newObj[this.keyField]} already exists`);
+        throw `${this.keyField} ${newObj[this.keyField]} already exists`;
       }
     }, this);
     currentDisplayData.unshift(newObj);
@@ -206,12 +184,12 @@ export class TableDataStore {
 
   add(newObj) {
     if (!newObj[this.keyField] || newObj[this.keyField].toString() === '') {
-      throw new Error(`${this.keyField} can't be empty value.`);
+      throw `${this.keyField} can't be empty value.`;
     }
     const currentDisplayData = this.getCurrentDisplayData();
     currentDisplayData.forEach(function(row) {
       if (row[this.keyField].toString() === newObj[this.keyField].toString()) {
-        throw new Error(`${this.keyField} ${newObj[this.keyField]} already exists`);
+        throw `${this.keyField} ${newObj[this.keyField]} already exists`;
       }
     }, this);
 
@@ -360,28 +338,24 @@ export class TableDataStore {
     try {
       return new RegExp(filterVal, 'i').test(targetVal);
     } catch (e) {
+      console.error('Invalid regular expression');
       return true;
     }
   }
 
-  filterCustom(targetVal, filterVal, callbackInfo, cond) {
+  filterCustom(targetVal, filterVal, callbackInfo) {
     if (callbackInfo !== null && typeof callbackInfo === 'object') {
       return callbackInfo.callback(targetVal, callbackInfo.callbackParameters);
     }
 
-    return this.filterText(targetVal, filterVal, cond);
+    return this.filterText(targetVal, filterVal);
   }
 
-  filterText(targetVal, filterVal, cond = Const.FILTER_COND_LIKE) {
-    targetVal = targetVal.toString();
-    filterVal = filterVal.toString();
-    if (cond === Const.FILTER_COND_EQ) {
-      return targetVal === filterVal;
-    } else {
-      targetVal = targetVal.toLowerCase();
-      filterVal = filterVal.toLowerCase();
-      return !(targetVal.indexOf(filterVal) === -1);
+  filterText(targetVal, filterVal) {
+    if (targetVal.toString().toLowerCase().indexOf(filterVal) === -1) {
+      return false;
     }
+    return true;
   }
 
   /* General search function
@@ -437,10 +411,12 @@ export class TableDataStore {
           break;
         }
         default: {
-          filterVal = filterObj[key].value;
+          filterVal = (typeof filterObj[key].value === 'string') ?
+            filterObj[key].value.toLowerCase() :
+            filterObj[key].value;
           if (filterVal === undefined) {
             // Support old filter
-            filterVal = filterObj[key];
+            filterVal = filterObj[key].toLowerCase();
           }
           break;
         }
@@ -472,8 +448,7 @@ export class TableDataStore {
           break;
         }
         case Const.FILTER_TYPE.CUSTOM: {
-          const cond = filterObj[key].props ? filterObj[key].props.cond : Const.FILTER_COND_LIKE;
-          valid = this.filterCustom(targetVal, filterVal, filterObj[key].value, cond);
+          valid = this.filterCustom(targetVal, filterVal, filterObj[key].value);
           break;
         }
         default: {
@@ -481,8 +456,7 @@ export class TableDataStore {
             filterFormatted && filterFormatted && format) {
             filterVal = format(filterVal, row, formatExtraData, r);
           }
-          const cond = filterObj[key].props ? filterObj[key].props.cond : Const.FILTER_COND_LIKE;
-          valid = this.filterText(targetVal, filterVal, cond);
+          valid = this.filterText(targetVal, filterVal);
           break;
         }
         }
@@ -511,11 +485,7 @@ export class TableDataStore {
       // http://jsperf.com/for-vs-foreach/66
       for (let i = 0, keysLength = keys.length; i < keysLength; i++) {
         const key = keys[i];
-        // fixed data filter when misunderstand 0 is false
-        let filterSpecialNum = false;
-        if (!isNaN(row[key]) &&
-          parseInt(row[key], 10) === 0) { filterSpecialNum = true; }
-        if (this.colInfos[key] && (row[key] || filterSpecialNum)) {
+        if (this.colInfos[key] && row[key]) {
           const {
             format,
             filterFormatted,
@@ -545,51 +515,6 @@ export class TableDataStore {
     this.isOnFilter = true;
   }
 
-  _sort(arr) {
-    if (this.sortList.length === 0 || typeof(this.sortList[0]) === 'undefined') {
-      return arr;
-    }
-
-    arr.sort((a, b) => {
-      let result = 0;
-
-      for (let i = 0; i < this.sortList.length; i++) {
-        const sortDetails = this.sortList[i];
-        const isDesc = sortDetails.order.toLowerCase() === Const.SORT_DESC;
-
-        const { sortFunc, sortFuncExtraData } = this.colInfos[sortDetails.sortField];
-
-        if (sortFunc) {
-          result = sortFunc(a, b, sortDetails.order, sortDetails.sortField, sortFuncExtraData);
-        } else {
-          const valueA = a[sortDetails.sortField] === null ? '' : a[sortDetails.sortField];
-          const valueB = b[sortDetails.sortField] === null ? '' : b[sortDetails.sortField];
-          if (isDesc) {
-            if (typeof valueB === 'string') {
-              result = valueB.localeCompare(valueA);
-            } else {
-              result = valueA > valueB ? -1 : ((valueA < valueB) ? 1 : 0);
-            }
-          } else {
-            if (typeof valueA === 'string') {
-              result = valueA.localeCompare(valueB);
-            } else {
-              result = valueA < valueB ? -1 : ((valueA > valueB) ? 1 : 0);
-            }
-          }
-        }
-
-        if (result !== 0) {
-          return result;
-        }
-      }
-
-      return result;
-    });
-
-    return arr;
-  }
-
   getDataIgnoringPagination() {
     return this.getCurrentDisplayData();
   }
@@ -599,10 +524,7 @@ export class TableDataStore {
 
     if (_data.length === 0) return _data;
 
-    const remote = typeof this.remote === 'function' ?
-      (this.remote(Const.REMOTE))[Const.REMOTE_PAGE] : this.remote;
-
-    if (remote || !this.enablePagination) {
+    if (this.remote || !this.enablePagination) {
       return _data;
     } else {
       const result = [];

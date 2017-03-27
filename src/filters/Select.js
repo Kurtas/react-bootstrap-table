@@ -12,29 +12,6 @@ class SelectFilter extends Component {
     };
   }
 
-  componentWillReceiveProps(nextProps) {
-    const isPlaceholderSelected = (nextProps.defaultValue === undefined ||
-      !nextProps.options.hasOwnProperty(nextProps.defaultValue));
-    this.setState({
-      isPlaceholderSelected
-    });
-  }
-
-  componentDidUpdate(prevProps) {
-    let needFilter = false;
-    if (this.props.defaultValue !== prevProps.defaultValue) {
-      needFilter = true;
-    } else if (this.props.options !== prevProps.options) {
-      needFilter = true;
-    }
-    if (needFilter) {
-      const value = this.refs.selectInput.value;
-      if (value) {
-        this.props.filterHandler(value, Const.FILTER_TYPE.SELECT);
-      }
-    }
-  }
-
   filter(event) {
     const { value } = event.target;
     this.setState({ isPlaceholderSelected: (value === '') });
@@ -57,13 +34,12 @@ class SelectFilter extends Component {
 
   getOptions() {
     const optionTags = [];
-    const { options, placeholder, columnName, selectText } = this.props;
-    const selectTextValue = (selectText !== undefined) ? selectText : 'Select';
+    const { options, placeholder, columnName } = this.props;
     optionTags.push((
-      <option key='-1' value=''>{ placeholder || `${selectTextValue} ${columnName}...` }</option>
+      <option key='-1' value=''>{ placeholder || `Select ${columnName}...` }</option>
     ));
     Object.keys(options).map(key => {
-      optionTags.push(<option key={ key } value={ key }>{ options[key] + '' }</option>);
+      optionTags.push(<option key={ key } value={ key }>{ options[key] }</option>);
     });
     return optionTags;
   }

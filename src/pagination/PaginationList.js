@@ -1,21 +1,8 @@
 import React, { Component, PropTypes } from 'react';
-import classSet from 'classnames';
 import PageButton from './PageButton.js';
-import SizePerPageDropDown from './SizePerPageDropDown';
 import Const from '../Const';
 
 class PaginationList extends Component {
-
-  constructor(props) {
-    super(props);
-    this.state = {
-      open: this.props.open
-    };
-  }
-
-  componentWillReceiveProps() {
-    this.setState({ open: false });
-  }
 
   changePage = page => {
     const {
@@ -45,8 +32,10 @@ class PaginationList extends Component {
     }
   }
 
-  changeSizePerPage = pageNum => {
-    const selectSize = typeof pageNum === 'string' ? parseInt(pageNum, 10) : pageNum;
+  changeSizePerPage = e => {
+    e.preventDefault();
+
+    const selectSize = parseInt(e.currentTarget.text, 10);
     let { currPage } = this.props;
     if (selectSize !== this.props.sizePerPage) {
       this.totalPages = Math.ceil(this.props.dataSize / selectSize);
@@ -56,15 +45,7 @@ class PaginationList extends Component {
       if (this.props.onSizePerPageList) {
         this.props.onSizePerPageList(selectSize);
       }
-    } else {
-      this.setState({ open: false });
     }
-  }
-
-  toggleDropDown = () => {
-    this.setState({
-      open: !this.state.open
-    });
   }
 
   render() {
@@ -75,172 +56,112 @@ class PaginationList extends Component {
       sizePerPageList,
       paginationShowsTotal,
       pageStartIndex,
-      paginationPanel,
-      hidePageListOnlyOnePage
+      hideSizePerPage
     } = this.props;
+
     this.totalPages = Math.ceil(dataSize / sizePerPage);
     this.lastPage = this.props.pageStartIndex + this.totalPages - 1;
-    const pageBtns = this.makePage(typeof paginationPanel === 'function');
-    const dropdown = this.makeDropDown();
+    const pageBtns = this.makePage();
+    const pageListStyle = {
+      float: 'right',
+      // override the margin-top defined in .pagination class in bootstrap.
+      marginTop: '0px'
+    };
+
+    const sizePerPageOptions = sizePerPageList.map((_sizePerPage) => {
+      return (
+        <li key={ _sizePerPage } role='presentation'>
+          <a role='menuitem'
+            tabIndex='-1' href='#'
+            onClick={ this.changeSizePerPage }>{ _sizePerPage }</a>
+        </li>
+      );
+    });
 
     const offset = Math.abs(Const.PAGE_START_INDEX - pageStartIndex);
-    let start = ((currPage - pageStartIndex) * sizePerPage);
-    start = dataSize === 0 ? 0 : start + 1;
-    let to = Math.min((sizePerPage * (currPage + offset) - 1), dataSize);
-    if (to >= dataSize) to--;
+    const start = ((currPage - pageStartIndex) * sizePerPage);
+    const to = Math.min((sizePerPage * (currPage + offset) - 1), dataSize);
     let total = paginationShowsTotal ? <span>
-      Showing rows { start } to&nbsp;{ to + 1 } of&nbsp;{ dataSize }
+      Showing rows { start } to&nbsp;{ to } of&nbsp;{ dataSize }
     </span> : null;
 
     if (typeof paginationShowsTotal === 'function') {
-      total = paginationShowsTotal(start, to + 1, dataSize);
+      total = paginationShowsTotal(start, to, dataSize);
     }
 
-    const content = paginationPanel && paginationPanel({
-      currPage,
-      sizePerPage,
-      sizePerPageList,
-      pageStartIndex,
-      changePage: this.changePage,
-      toggleDropDown: this.toggleDropDown,
-      changeSizePerPage: this.changeSizePerPage,
-      components: {
-        totalText: total,
-        sizePerPageDropdown: dropdown,
-        pageList: pageBtns
-      }
-    });
+    const dropDownStyle = {
+      visibility: hideSizePerPage ? 'hidden' : 'visible'
+    };
 
-    const hidePageList = hidePageListOnlyOnePage && this.totalPages === 1 ? 'none' : 'block';
     return (
       <div className='row' style={ { marginTop: 15 } }>
         {
-          content ||
-          <div>
-            <div className='col-md-6 col-xs-6 col-sm-6 col-lg-6'>
-              { total }{ sizePerPageList.length > 1 ? dropdown : null }
+          sizePerPageList.length > 1
+          ? <div>
+              <div className='col-md-6'>
+                { total }{ ' ' }
+                <span className='dropdown' style={ dropDownStyle }>
+                  <button className='btn btn-default dropdown-toggle'
+                    type='button' id='pageDropDown' data-toggle='dropdown'
+                    aria-expanded='true'>
+                    { sizePerPage }
+                    <span>
+                      { ' ' }
+                      <span className='caret'/>
+                    </span>
+                  </button>
+                  <ul className='dropdown-menu' role='menu' aria-labelledby='pageDropDown'>
+                    { sizePerPageOptions }
+                  </ul>
+                </span>
+              </div>
+              <div className='col-md-6'>
+                <ul className='pagination' style={ pageListStyle }>
+                  { pageBtns }
+                </ul>
+              </div>
             </div>
-            <div style={ { display: hidePageList } }
-              className='col-md-6 col-xs-6 col-sm-6 col-lg-6'>
-              { pageBtns }
+          : <div>
+              <div className='col-md-6'>
+                { total }
+              </div>
+              <div className='col-md-6'>
+                <ul className='pagination' style={ pageListStyle }>
+                  { pageBtns }
+                </ul>
+              </div>
             </div>
-          </div>
         }
       </div>
     );
   }
 
-  makeDropDown() {
-    let dropdown;
-    let dropdownProps;
-    let sizePerPageText = '';
-    const {
-      sizePerPageDropDown,
-      hideSizePerPage,
-      sizePerPage,
-      sizePerPageList
-    } = this.props;
-    if (sizePerPageDropDown) {
-      dropdown = sizePerPageDropDown({
-        open: this.state.open,
-        hideSizePerPage,
-        currSizePerPage: sizePerPage,
-        sizePerPageList,
-        toggleDropDown: this.toggleDropDown,
-        changeSizePerPage: this.changeSizePerPage
-      });
-      if (dropdown.type.name === SizePerPageDropDown.name) {
-        dropdownProps = dropdown.props;
-      } else {
-        return dropdown;
-      }
-    }
-
-    if (dropdownProps || !dropdown) {
-      const sizePerPageOptions = sizePerPageList.map((_sizePerPage) => {
-        const pageText = _sizePerPage.text || _sizePerPage;
-        const pageNum = _sizePerPage.value || _sizePerPage;
-        if (sizePerPage === pageNum) sizePerPageText = pageText;
-        return (
-          <li key={ pageText } role='presentation'>
-            <a role='menuitem'
-              tabIndex='-1' href='#'
-              data-page={ pageNum }
-              onClick={ e => {
-                e.preventDefault();
-                this.changeSizePerPage(pageNum);
-              } }>{ pageText }</a>
-          </li>
-        );
-      });
-      dropdown = (
-        <SizePerPageDropDown
-          open={ this.state.open }
-          hidden={ hideSizePerPage }
-          currSizePerPage={ String(sizePerPageText) }
-          options={ sizePerPageOptions }
-          onClick={ this.toggleDropDown }
-          { ...dropdownProps }/>
-      );
-    }
-    return dropdown;
-  }
-
-  makePage(isCustomPagingPanel = false) {
+  makePage() {
     const pages = this.getPages();
-    const isStart = (page, { currPage, pageStartIndex, firstPage, prePage }) =>
-      (currPage === pageStartIndex && (page === firstPage || page === prePage));
-    const isEnd = (page, { currPage, nextPage, lastPage }) =>
-      (currPage === this.lastPage && (page === nextPage || page === lastPage ));
-    const pageBtns = pages
-      .filter(function(page) {
-        if (this.props.alwaysShowAllBtns) {
-          return true;
-        }
-        return (isStart(page, this.props) || isEnd(page, this.props)) ?
-          false :
-          true;
-      }, this)
-      .map(function(page) {
-        const isActive = page === this.props.currPage;
-        const isDisabled = (isStart(page, this.props) || isEnd(page, this.props)) ?
-          true :
-          false;
-        let title = page + '';
-
-        if (page === this.props.nextPage) {
-          title = this.props.nextPageTitle;
-        } else if (page === this.props.prePage) {
-          title = this.props.prePageTitle;
-        } else if (page === this.props.firstPage) {
-          title = this.props.firstPageTitle;
-        } else if (page === this.props.lastPage) {
-          title = this.props.lastPageTitle;
-        }
-
-        return (
-          <PageButton key={ page }
-            title={ title }
-            changePage={ this.changePage }
-            active={ isActive }
-            disable={ isDisabled }>
-            { page }
-          </PageButton>
-        );
-      }, this);
-    const classname = classSet(
-      isCustomPagingPanel ? null : 'react-bootstrap-table-page-btns-ul',
-      'pagination'
-    );
-    return (
-        <ul className={ classname }>
-          { pageBtns }
-        </ul>
+    return pages.map(function(page) {
+      const isActive = page === this.props.currPage;
+      let disabled = false;
+      let hidden = false;
+      if (this.props.currPage === this.props.pageStartIndex &&
+        (page === this.props.firstPage || page === this.props.prePage)) {
+        disabled = true;
+        hidden = true;
+      }
+      if (this.props.currPage === this.lastPage &&
+        (page === this.props.nextPage || page === this.props.lastPage)) {
+        disabled = true;
+        hidden = true;
+      }
+      return (
+        <PageButton key={ page }
+          changePage={ this.changePage }
+          active={ isActive }
+          disable={ disabled }
+          hidden={ hidden }>
+          { page }
+        </PageButton>
       );
-  }
-
-  getLastPage() {
-    return this.lastPage;
+    }, this);
   }
 
   getPages() {
@@ -258,11 +179,9 @@ class PaginationList extends Component {
       startPage = endPage - this.props.paginationSize + 1;
     }
 
-    if (startPage !== this.props.pageStartIndex
-      && this.totalPages > this.props.paginationSize
-      && this.props.withFirstAndLast) {
+    if (startPage !== this.props.pageStartIndex && this.totalPages > this.props.paginationSize) {
       pages = [ this.props.firstPage, this.props.prePage ];
-    } else if (this.totalPages > 1 || this.props.alwaysShowAllBtns) {
+    } else if (this.totalPages > 1) {
       pages = [ this.props.prePage ];
     } else {
       pages = [];
@@ -272,11 +191,11 @@ class PaginationList extends Component {
       if (i >= this.props.pageStartIndex) pages.push(i);
     }
 
-    if (endPage <= this.lastPage) {
+    if (endPage < this.lastPage) {
       pages.push(this.props.nextPage);
-    }
-    if (endPage !== this.totalPages && this.props.withFirstAndLast) {
       pages.push(this.props.lastPage);
+    } else if (endPage === this.lastPage && this.props.currPage !== this.lastPage) {
+      pages.push(this.props.nextPage);
     }
 
     return pages;
@@ -290,19 +209,11 @@ PaginationList.propTypes = {
   sizePerPageList: PropTypes.array,
   paginationShowsTotal: PropTypes.oneOfType([ PropTypes.bool, PropTypes.func ]),
   paginationSize: PropTypes.number,
+  remote: PropTypes.bool,
   onSizePerPageList: PropTypes.func,
   prePage: PropTypes.string,
   pageStartIndex: PropTypes.number,
-  hideSizePerPage: PropTypes.bool,
-  alwaysShowAllBtns: PropTypes.bool,
-  withFirstAndLast: PropTypes.bool,
-  sizePerPageDropDown: PropTypes.func,
-  paginationPanel: PropTypes.func,
-  prePageTitle: PropTypes.string,
-  nextPageTitle: PropTypes.string,
-  firstPageTitle: PropTypes.string,
-  lastPageTitle: PropTypes.string,
-  hidePageListOnlyOnePage: PropTypes.bool
+  hideSizePerPage: PropTypes.bool
 };
 
 PaginationList.defaultProps = {

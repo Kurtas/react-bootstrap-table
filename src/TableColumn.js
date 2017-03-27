@@ -1,5 +1,4 @@
 import React, { Component, PropTypes } from 'react';
-import ReactDOM from 'react-dom';
 import Const from './Const';
 
 class TableColumn extends Component {
@@ -14,7 +13,6 @@ class TableColumn extends Component {
       || this.props.className !== nextProps.className
       || this.props.hidden !== nextProps.hidden
       || this.props.dataAlign !== nextProps.dataAlign
-      || this.props.isFocus !== nextProps.isFocus
       || typeof children !== typeof nextProps.children
       || ('' + this.props.onEdit).toString() !== ('' + nextProps.onEdit).toString();
 
@@ -26,8 +24,7 @@ class TableColumn extends Component {
       if (children.props.type === 'checkbox' || children.props.type === 'radio') {
         shouldUpdated = shouldUpdated ||
           children.props.type !== nextProps.children.props.type ||
-          children.props.checked !== nextProps.children.props.checked ||
-          children.props.disabled !== nextProps.children.props.disabled;
+          children.props.checked !== nextProps.children.props.checked;
       } else {
         shouldUpdated = true;
       }
@@ -47,24 +44,6 @@ class TableColumn extends Component {
     }
   }
 
-  componentDidMount() {
-    const dom = ReactDOM.findDOMNode(this);
-    if (this.props.isFocus) {
-      dom.focus();
-    } else {
-      dom.blur();
-    }
-  }
-
-  componentDidUpdate() {
-    const dom = ReactDOM.findDOMNode(this);
-    if (this.props.isFocus) {
-      dom.focus();
-    } else {
-      dom.blur();
-    }
-  }
-
   handleCellEdit = e => {
     if (this.props.cellEdit.mode === Const.CELL_EDIT_DBCLICK) {
       if (document.selection && document.selection.empty) {
@@ -75,110 +54,46 @@ class TableColumn extends Component {
       }
     }
     this.props.onEdit(
-      this.props.rIndex + 1, e.currentTarget.cellIndex, e);
-    if (this.props.cellEdit.mode !== Const.CELL_EDIT_DBCLICK) {
-      this.props.onClick(this.props.rIndex + 1, e.currentTarget.cellIndex, e);
-    }
-  }
-
-  handleCellClick = e => {
-    const { onClick, rIndex } = this.props;
-    if (onClick) {
-      onClick(rIndex + 1, e.currentTarget.cellIndex, e);
-    }
-  }
-
-  handleKeyDown = e => {
-    if (this.props.keyBoardNav) {
-      this.props.onKeyDown(e);
-    }
+      e.currentTarget.parentElement.rowIndex + 1,
+      e.currentTarget.cellIndex,
+      e);
   }
 
   render() {
-    const {
-      children,
-      columnTitle,
-      dataAlign,
-      hidden,
-      cellEdit,
-      attrs,
-      style,
-      isFocus,
-      keyBoardNav,
-      tabIndex,
-      customNavStyle,
-      row
-    } = this.props;
-
-    let { className } = this.props;
-
-    let tdStyle = {
-      textAlign: dataAlign,
-      display: hidden ? 'none' : null,
-      ...style
+    const tdStyle = {
+      textAlign: this.props.dataAlign,
+      display: this.props.hidden ? 'none' : null
     };
 
     const opts = {};
-
-    if (cellEdit) {
-      if (cellEdit.mode === Const.CELL_EDIT_CLICK) {
+    if (this.props.cellEdit) {
+      if (this.props.cellEdit.mode === Const.CELL_EDIT_CLICK) {
         opts.onClick = this.handleCellEdit;
-      } else if (cellEdit.mode === Const.CELL_EDIT_DBCLICK) {
+      } else if (this.props.cellEdit.mode === Const.CELL_EDIT_DBCLICK) {
         opts.onDoubleClick = this.handleCellEdit;
-      } else {
-        opts.onClick = this.handleCellClick;
-      }
-    }
-
-    if (keyBoardNav && isFocus) {
-      opts.onKeyDown = this.handleKeyDown;
-    }
-
-    if (isFocus) {
-      if (customNavStyle) {
-        const cusmtStyle = typeof customNavStyle === 'function' ?
-          customNavStyle(children, row) : customNavStyle;
-        tdStyle = {
-          ...tdStyle,
-          ...cusmtStyle
-        };
-      } else {
-        className = `${className} default-focus-cell`;
       }
     }
     return (
-      <td tabIndex={ tabIndex } style={ tdStyle }
-          title={ columnTitle }
-          className={ className }
-          { ...opts } { ...attrs }>
-        { typeof children === 'boolean' ? children.toString() : children }
+      <td style={ tdStyle }
+          title={ this.props.columnTitle }
+          className={ this.props.className }
+          { ...opts }>
+        { this.props.children }
       </td>
     );
   }
 }
 TableColumn.propTypes = {
-  rIndex: PropTypes.number,
   dataAlign: PropTypes.string,
   hidden: PropTypes.bool,
   className: PropTypes.string,
   columnTitle: PropTypes.string,
-  children: PropTypes.node,
-  onClick: PropTypes.func,
-  attrs: PropTypes.object,
-  style: PropTypes.object,
-  isFocus: PropTypes.bool,
-  onKeyDown: PropTypes.func,
-  tabIndex: PropTypes.string,
-  keyBoardNav: PropTypes.oneOfType([ PropTypes.bool, PropTypes.object ]),
-  customNavStyle: PropTypes.oneOfType([ PropTypes.func, PropTypes.object ]),
-  row: PropTypes.any  /* only used on custom styling for navigation */
+  children: PropTypes.node
 };
 
 TableColumn.defaultProps = {
   dataAlign: 'left',
   hidden: false,
-  className: '',
-  isFocus: false,
-  keyBoardNav: false
+  className: ''
 };
 export default TableColumn;
