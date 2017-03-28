@@ -636,6 +636,11 @@ class BootstrapTable extends Component {
       onFilterChange(filterObj, colInfos);
     }
 
+    Object.keys(filterObj).forEach(key => {
+      const val = filterObj[key].value;
+      if (val === undefined) delete filterObj[key];
+    });
+
     this.setState({
       currPage: this.props.options.pageStartIndex || Const.PAGE_START_INDEX
     });

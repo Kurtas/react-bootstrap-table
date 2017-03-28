@@ -367,6 +367,11 @@ return /******/ (function(modules) { // webpackBootstrap
 	        onFilterChange(filterObj, colInfos);
 	      }
 
+	      Object.keys(filterObj).forEach(function (key) {
+	        var val = filterObj[key].value;
+	        if (val === undefined) delete filterObj[key];
+	      });
+
 	      _this.setState({
 	        currPage: _this.props.options.pageStartIndex || _Const2['default'].PAGE_START_INDEX
 	      });
@@ -11022,8 +11027,8 @@ return /******/ (function(modules) { // webpackBootstrap
 	    value: function handleFilter(dataField, value, type) {
 	      var filterType = type || _Const2['default'].FILTER_TYPE.CUSTOM;
 	      if (typeof value === 'string') value = value.trim();
+	      if (typeof value.comparator === 'string' && value.comparator === '') value = undefined;
 	      this.currentFilter[dataField] = { column: dataField, value: value, type: filterType };
-
 	      this.emit('onFilterChange', this.currentFilter);
 	    }
 	  }]);
